@@ -1,0 +1,48 @@
+# D1 Sync - Docker Compose Configuration
+
+services:
+  # Main sync service
+  d1-sync:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: d1-sync
+    volumes:
+      # Mount your SQLite databases here
+      - ./data:/data:rw
+      # Mount configuration
+      - ./config.toml:/config/config.toml:ro
+    environment:
+      # Required credentials (use .env file or pass directly)
+      - D1_SYNC_CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN:-}
+      - D1_SYNC_CLOUDFLARE_ACCOUNT_ID=${CLOUDFLARE_ACCOUNT_ID:-}
+      - D1_SYNC_DATABASE_NAME=${D1_DATABASE_NAME:-}
+      - D1_SYNC_DATABASE_ID=${D1_DATABASE_ID:-}
+      # Optional settings
+      - D1_SYNC_TIER=${D1_TIER:-free}
+      - D1_SYNC_LOGGING__LEVEL=${LOG_LEVEL:-INFO}
+    # Override entrypoint for different commands
+    # command: ["push", "--source", "/data/database.db"]
+    restart: "no"
+
+  # Development service with live reload
+  d1-sync-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    container_name: d1-sync-dev
+    volumes:
+      - ./src:/app/src:rw
+      - ./data:/data:rw
+      - ./tests:/app/tests:rw
+    environment:
+      - D1_SYNC_CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN:-}
+      - D1_SYNC_CLOUDFLARE_ACCOUNT_ID=${CLOUDFLARE_ACCOUNT_ID:-}
+      - D1_SYNC_DATABASE_NAME=${D1_DATABASE_NAME:-}
+      - D1_SYNC_DATABASE_ID=${D1_DATABASE_ID:-}
+    working_dir: /app
+    command: ["python", "-m", "d1_sync", "--help"]
+    profiles:
+      - dev

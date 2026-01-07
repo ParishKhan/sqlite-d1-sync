@@ -1,0 +1,82 @@
+# =============================================================================
+# D1 SYNC CONFIGURATION EXAMPLE
+# =============================================================================
+# Rename this file to 'config.toml' to use it.
+#
+# RULE OF THUMB:
+# - In this file, use keys like 'cloudflare_api_token' (NO PREFIX)
+# - In .env file, use keys like 'D1_SYNC_CLOUDFLARE_API_TOKEN' (WITH PREFIX)
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 1. Credentials
+# -----------------------------------------------------------------------------
+cloudflare_account_id = "your-account-id"
+
+# You can put the token here, OR set D1_SYNC_CLOUDFLARE_API_TOKEN env var
+# cloudflare_api_token = "your-secret-token" 
+
+database_name = "tutorials-db"
+database_id = "optional-uuid"
+
+# -----------------------------------------------------------------------------
+# 2. Account Tier
+# -----------------------------------------------------------------------------
+# Options: "free" or "paid"
+# - Free: Max 100KB SQL size
+# - Paid: Higher concurrency allowed
+tier = "free"
+
+# -----------------------------------------------------------------------------
+# 3. Performance Tuning
+# -----------------------------------------------------------------------------
+[limits]
+# How many rows to send in one web request.
+# - Default: 100
+# - Recommended for simple data: 500-1000
+# - If you get "Request too large" errors, lower this value.
+max_rows_per_batch = 100
+
+# Safety margin for batch size calculation (0.0 to 1.0)
+batch_safety_margin = 0.85
+
+# -----------------------------------------------------------------------------
+# 4. Sync Behavior
+# -----------------------------------------------------------------------------
+[sync]
+# Safety First!
+# false = INSERT OR IGNORE (Skip row if ID exists) -> SAFE
+# true  = INSERT OR REPLACE (Overwrite row if ID exists) -> DESTRUCTIVE
+overwrite = false
+
+# Enable resuming from last successful batch?
+resume = true
+
+# Verify row counts after sync?
+verify_after_sync = true
+
+# Checksum algorithm for verification (md5 or sha256)
+checksum_algorithm = "md5"
+
+# List of tables to sync (empty = all tables)
+# tables = ["users", "posts"]
+
+# List of tables to IGNORE
+exclude_tables = [
+    "sqlite_sequence", 
+    "_cf_KV",
+    "d1_migrations"
+]
+
+# -----------------------------------------------------------------------------
+# 5. Logging
+# -----------------------------------------------------------------------------
+[logging]
+# DEBUG, INFO, WARNING, ERROR
+level = "INFO"
+
+# "rich" (colorful) or "json" (machine readable)
+format = "rich"
+
+# Where to save rows that failed to upload
+failed_rows_file = "failed_rows.json"
