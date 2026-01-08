@@ -155,7 +155,7 @@ level = "INFO"
 failed_rows_file = "failed_rows.json"
 ```
 
-## ❓ FAQ
+## ❓ FAQ:
 
 **Q: My upload is slow!**
 A: In `config.toml`, under `[limits]`, increase `max_rows_per_batch` to `500` or `1000`.
