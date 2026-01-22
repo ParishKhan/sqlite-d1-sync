@@ -434,6 +434,176 @@ def verify(
 
 
 # =============================================================================
+# SYNC-SLUGS Command
+# =============================================================================
+@app.command()
+def sync_slugs(
+    source: Path = typer.Option(
+        ...,
+        "--source",
+        "-s",
+        help="Path to local SQLite database with slug fixes.",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        resolve_path=True,
+    ),
+    table: str = typer.Option(
+        "tutorials",
+        "--table",
+        "-t",
+        help="Table name to sync (default: tutorials).",
+    ),
+    database: str = typer.Option(
+        None,
+        "--database",
+        "-d",
+        help="D1 database name (overrides config).",
+    ),
+    database_id: str = typer.Option(
+        None,
+        "--database-id",
+        help="D1 database ID (overrides config).",
+    ),
+    account_id: str = typer.Option(
+        None,
+        "--account-id",
+        help="Cloudflare account ID (overrides config).",
+    ),
+    api_token: str = typer.Option(
+        None,
+        "--api-token",
+        envvar="D1_SYNC_CLOUDFLARE_API_TOKEN",
+        help="Cloudflare API token.",
+    ),
+    config_file: Path = typer.Option(
+        None,
+        "--config",
+        "-c",
+        help="Path to config file.",
+        exists=True,
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        "-n",
+        help="Preview changes without executing.",
+    ),
+    quiet: bool = typer.Option(
+        False,
+        "--quiet",
+        "-q",
+        help="Minimal output.",
+    ),
+) -> None:
+    """
+    Sync slug fixes from local SQLite to Cloudflare D1.
+
+    This command syncs only the rows that were fixed by the slug fixer
+    (where slug_old IS NOT NULL), making it much faster than a full push.
+
+    Example:
+        d1-sync sync-slugs --source ./tutorials.db --dry-run
+    """
+    from d1_sync.core.slug_sync import SlugSyncEngine, SlugSyncStats
+
+    # Build settings
+    try:
+        settings = _build_settings(
+            config_file=config_file,
+            database=database,
+            database_id=database_id,
+            account_id=account_id,
+            api_token=api_token,
+        )
+        settings.sync.dry_run = dry_run
+    except ValueError as e:
+        print_error(str(e))
+        raise typer.Exit(1)
+
+    # Validate credentials
+    errors = settings.validate_credentials()
+    if errors:
+        for err in errors:
+            print_error(err)
+        print_info("Use --help for configuration options.")
+        raise typer.Exit(1)
+
+    if dry_run:
+        print_warning("DRY RUN - No changes will be made")
+
+    engine = SlugSyncEngine(settings)
+
+    # Progress display
+    display = ProgressDisplay() if not quiet else None
+
+    def on_progress(stats: SlugSyncStats) -> None:
+        if display:
+            display.update(
+                rows_processed=stats.rows_updated,
+                rows_failed=stats.rows_failed,
+                tables_processed=1 if stats.rows_updated > 0 else 0,
+            )
+
+    try:
+        # Start display
+        if display:
+            display.start(
+                operation="sync-slugs",
+                source=source.name,
+                destination=f"{settings.database_name}@D1",
+                total_rows=0,  # Unknown until we query
+                total_tables=1,
+            )
+
+        # Run sync
+        stats = asyncio.run(engine.sync(source, table=table, on_progress=on_progress))
+
+        # Update display with actual total
+        if display and stats.rows_to_sync > 0:
+            display.update(rows_processed=stats.rows_updated)
+
+    finally:
+        if display:
+            display.stop()
+
+    # Print summary
+    if not quiet:
+        summary_table = Table(title="Slug Sync Summary", border_style="cyan")
+        summary_table.add_column("Metric", style="cyan")
+        summary_table.add_column("Value")
+
+        summary_table.add_row("Rows to sync", f"{stats.rows_to_sync:,}")
+        summary_table.add_row(
+            "Rows updated", f"[green]{stats.rows_updated:,}[/green]"
+        )
+        if stats.rows_failed > 0:
+            summary_table.add_row(
+                "Rows failed", f"[red]{stats.rows_failed:,}[/red]"
+            )
+        summary_table.add_row(
+            "Column added", "Yes" if stats.column_added else "Already existed"
+        )
+        summary_table.add_row("Duration", f"{stats.duration_seconds:.1f}s")
+
+        console.print(summary_table)
+
+    # Handle errors
+    if stats.errors:
+        console.print()
+        print_warning(f"{len(stats.errors)} errors occurred:")
+        for err in stats.errors[:10]:
+            print_error(f"  • {err}")
+        if len(stats.errors) > 10:
+            print_info(f"  ... and {len(stats.errors) - 10} more")
+
+    if stats.rows_failed > 0:
+        raise typer.Exit(1)
+    else:
+        print_success("Slug sync completed successfully!")
+
+
+# =============================================================================
 # CONFIG Command
 # =============================================================================
 @app.command()
