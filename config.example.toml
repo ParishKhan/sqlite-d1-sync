@@ -16,7 +16,7 @@ cloudflare_account_id = "your-account-id"
 # You can put the token here, OR set D1_SYNC_CLOUDFLARE_API_TOKEN env var
 # cloudflare_api_token = "your-secret-token" 
 
-database_name = "tutorials-db"
+database_name = "tutorials-db-latest"
 database_id = "optional-uuid"
 
 # -----------------------------------------------------------------------------

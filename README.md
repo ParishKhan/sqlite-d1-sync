@@ -53,7 +53,7 @@ Create a `.env` file or export these variables:
 # notice the D1_SYNC_ prefix!
 export D1_SYNC_CLOUDFLARE_ACCOUNT_ID="your-account-id"
 export D1_SYNC_CLOUDFLARE_API_TOKEN="your-api-token"
-export D1_SYNC_DATABASE_NAME="tutorials-db"
+export D1_SYNC_DATABASE_NAME="tutorials-db-latest"
 ```
 
 #### Option B: Using a Config File (Easier for Local Use)
@@ -64,7 +64,7 @@ Create a `config.toml` file. **Note:** Variable names here DO NOT have the `D1_S
 # config.toml
 cloudflare_account_id = "your-account-id"
 cloudflare_api_token = "your-api-token"  # No prefix here!
-database_name = "tutorials-db"
+database_name = "tutorials-db-latest"
 tier = "free"
 ```
 
@@ -182,7 +182,7 @@ Slug Sync Summary
 # Set credentials once
 export D1_SYNC_CLOUDFLARE_API_TOKEN="your-token"
 export D1_SYNC_CLOUDFLARE_ACCOUNT_ID="your-account-id"
-export D1_SYNC_DATABASE_NAME="tutorials-db"
+export D1_SYNC_DATABASE_NAME="tutorials-db-latest"
 
 # Run sync (no need to specify credentials each time)
 d1-sync sync-slugs --source tutorials.db
@@ -195,7 +195,7 @@ d1-sync sync-slugs --source tutorials.db
 cat > config.toml << EOF
 cloudflare_account_id = "your-account-id"
 cloudflare_api_token = "your-api-token"
-database_name = "tutorials-db"
+database_name = "tutorials-db-latest"
 EOF
 
 # Run sync with config
@@ -320,7 +320,7 @@ Here is the simple rule:
 # ==========================================
 cloudflare_account_id = "fe51..."
 cloudflare_api_token = "wAL..."      # Ensure this token has "D1: Edit" permissions
-database_name = "tutorials-db"
+database_name = "tutorials-db-latest"
 database_id = "1863..."              # Optional, but recommended
 
 # ==========================================
