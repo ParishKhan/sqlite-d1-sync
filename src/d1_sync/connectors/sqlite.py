@@ -158,8 +158,8 @@ class SQLiteConnector:
         with self.connection() as conn:
             cursor = conn.execute(
                 """
-                SELECT name, sql FROM sqlite_master 
-                WHERE type = 'table' 
+                SELECT name, sql FROM sqlite_master
+                WHERE type = 'table'
                 AND name NOT LIKE 'sqlite_%'
                 AND name NOT LIKE '_cf_%'
                 ORDER BY name
@@ -192,7 +192,72 @@ class SQLiteConnector:
                     )
                 )
 
-        return tables
+        # Sort tables by foreign key dependencies (topological order)
+        return self._sort_tables_by_dependencies(tables)
+
+    def _sort_tables_by_dependencies(self, tables: list[TableInfo]) -> list[TableInfo]:
+        """
+        Sort tables topologically to respect foreign key constraints.
+
+        Tables with no dependencies come first, then tables that reference them,
+        etc. This ensures that when syncing, parent tables are created before
+        child tables that reference them via foreign keys.
+        """
+        import re
+
+        # Build a map of table name to TableInfo
+        table_map = {table.name: table for table in tables}
+        all_table_names = set(table_map.keys())
+
+        # Parse foreign key dependencies from CREATE TABLE statements
+        dependencies: dict[str, set[str]] = {}
+        for table in tables:
+            deps = set()
+            # Match FOREIGN KEY (column) REFERENCES table_name
+            fk_matches = re.findall(
+                r'FOREIGN KEY\s*\([^)]+\)\s*REFERENCES\s+"?([a-zA-Z_][a-zA-Z0-9_]*)',
+                table.create_sql,
+                re.IGNORECASE
+            )
+            for ref_table in fk_matches:
+                # Only add as dependency if it's a table in our schema
+                if ref_table in all_table_names and ref_table != table.name:
+                    deps.add(ref_table)
+            dependencies[table.name] = deps
+
+        # Topological sort using Kahn's algorithm
+        sorted_tables: list[TableInfo] = []
+        remaining_tables = {name: deps.copy() for name, deps in dependencies.items()}
+
+        # Start with tables that have no dependencies
+        ready = [name for name, deps in remaining_tables.items() if not deps]
+
+        while ready:
+            # Sort alphabetically for deterministic order
+            ready.sort()
+            table_name = ready.pop(0)
+
+            # Add this table to the result (only once!)
+            if table_map[table_name] not in sorted_tables:
+                sorted_tables.append(table_map[table_name])
+
+            # Remove this table from dependencies of remaining tables
+            for name in list(remaining_tables.keys()):
+                if table_name in remaining_tables[name]:
+                    remaining_tables[name].remove(table_name)
+                    # If this table now has no dependencies, add to ready
+                    if not remaining_tables[name]:
+                        ready.append(name)
+                        del remaining_tables[name]
+
+        # Handle circular dependencies (shouldn't happen in well-formed schemas)
+        if remaining_tables:
+            # Just append the remaining tables in alphabetical order
+            for name in sorted(remaining_tables.keys()):
+                if table_map[name] not in sorted_tables:
+                    sorted_tables.append(table_map[name])
+
+        return sorted_tables
 
     def _get_column_info(
         self, conn: sqlite3.Connection, table: str
